@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Für Lana – Sternenfängerin</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #fff;
+    background: radial-gradient(circle at 20% 15%, #49306f 0, transparent 35%),
+                radial-gradient(circle at 80% 85%, #173d67 0, transparent 38%),
+                #100d24;
+    overflow-x: hidden;
+  }
+  .shell { width: min(92vw, 620px); padding: 24px 0; text-align: center; }
+  h1 { margin: 0 0 6px; font-size: clamp(2rem, 6vw, 3rem); letter-spacing: -.04em; }
+  .sub { margin: 0 0 18px; color: #d9c9f4; }
+  .hud { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+  .pill { flex: 1; padding: 10px 12px; border: 1px solid #ffffff26; border-radius: 14px;
+          background: #ffffff12; font-weight: 700; }
+  .pill span { color: #ffd76a; }
+  #game {
+    position: relative; height: min(62vh, 440px); min-height: 320px; overflow: hidden;
+    border: 1px solid #ffffff35; border-radius: 22px;
+    background: linear-gradient(180deg, #1a1740, #171b3c 65%, #202b50);
+    box-shadow: 0 18px 55px #0007, inset 0 0 45px #9c7bff18;
+    touch-action: none;
+  }
+  #game::before { content:""; position:absolute; inset:0; opacity:.55;
+    background-image: radial-gradient(2px 2px at 12% 18%, #fff 98%, transparent),
+      radial-gradient(1px 1px at 72% 23%, #fff 98%, transparent),
+      radial-gradient(2px 2px at 48% 54%, #fff 98%, transparent),
+      radial-gradient(1px 1px at 88% 72%, #fff 98%, transparent),
+      radial-gradient(2px 2px at 25% 83%, #fff 98%, transparent);
+    pointer-events:none; }
+  #basket { position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
+    font-size:42px; width:62px; line-height:1; filter: drop-shadow(0 5px 7px #0008); }
+  .falling { position:absolute; top:-40px; font-size:27px; user-select:none; pointer-events:none;
+    filter: drop-shadow(0 3px 5px #0007); }
+  #overlay { position:absolute; inset:0; display:grid; place-items:center; padding:24px;
+    background:#100d24b8; backdrop-filter:blur(5px); }
+  .panel { max-width:390px; padding:24px; border-radius:20px; background:#27204c;
+    border:1px solid #ffffff35; box-shadow:0 12px 35px #0006; }
+  .panel h2 { margin:0 0 8px; font-size:1.65rem; }
+  .panel p { color:#e2d9f6; line-height:1.5; }
+  button { border:0; border-radius:999px; padding:12px 22px; font:inherit;
+    font-weight:800; color:#25183f; background:linear-gradient(100deg,#ffe28a,#ffb8d1);
+    cursor:pointer; box-shadow:0 5px 18px #0004; }
+  button:hover { transform:translateY(-1px); }
+  .help { margin:13px 0 0; color:#c9c1e1; font-size:.9rem; }
+  .mobile { display:none; gap:14px; justify-content:center; margin-top:12px; }
+  .mobile button { width:74px; font-size:1.3rem; }
+  @media (pointer:coarse) { .mobile { display:flex; } }
+</style>
+</head>
+<body>
+<main class="shell">
+  <h1>✨ Sternenfängerin ✨</h1>
+  <p class="sub">Ein kleines Spiel nur für Lana 💜</p>
+  <div class="hud">
+    <div class="pill">Punkte: <span id="score">0</span></div>
+    <div class="pill">Zeit: <span id="time">30</span>s</div>
+    <div class="pill">Rekord: <span id="best">0</span></div>
+  </div>
+  <section id="game" aria-label="Spielfeld">
+    <div id="basket">🧺</div>
+    <div id="overlay">
+      <div class="panel">
+        <h2>Bereit, Lana? 🌟</h2>
+        <p>Fang so viele Sterne wie möglich! Den Bomben 💣 solltest du ausweichen.</p>
+        <button id="start">Spiel starten</button>
+      </div>
+    </div>
+  </section>
+  <div class="mobile">
+    <button id="left" aria-label="Nach links">←</button>
+    <button id="right" aria-label="Nach rechts">→</button>
+  </div>
+  <p class="help">Steuerung: ← → oder A / D · Am Handy die Pfeile antippen</p>
+</main>
+<script>
+(() => {
+  const game = document.getElementById('game');
+  const basket = document.getElementById('basket');
+  const overlay = document.getElementById('overlay');
+  const scoreEl = document.getElementById('score');
+  const timeEl = document.getElementById('time');
+  const bestEl = document.getElementById('best');
+  let score = 0, time = 30, x = 50, running = false, last = 0;
+  let items = [], spawnTimer = 0, raf = 0, clock = 0;
+  let left = false, right = false;
+  let best = Number(localStorage.getItem('lana-star-best') || 0);
+  bestEl.textContent = best;
+
+  function moveBasket() {
+    x = Math.max(6, Math.min(94, x));
+    basket.style.left = x + '%';
+  }
+  function spawn() {
+    const bomb = Math.random() < 0.19;
+    const el = document.createElement('div');
+    el.className = 'falling';
+    el.textContent = bomb ? '💣' : (Math.random() < .25 ? '💖' : '⭐');
+    const item = { el, x: 5 + Math.random() * 90, y: -35, speed: 105 + Math.random() * 90, bomb };
+    el.style.left = item.x + '%';
+    game.appendChild(el);
+    items.push(item);
+  }
+  function endGame() {
+    running = false; cancelAnimationFrame(raf); clearInterval(clock);
+    items.forEach(i => i.el.remove()); items = [];
+    if (score > best) {
+      best = score; localStorage.setItem('lana-star-best', best); bestEl.textContent = best;
+    }
+    overlay.innerHTML = `<div class="panel"><h2>${score >= 15 ? 'Wow, Lana! 🏆' : 'Gut gespielt, Lana! 💜'}</h2>
+      <p>Du hast <strong>${score} Punkte</strong> gesammelt.${score > best ? ' Neuer Rekord!' : ''}</p>
+      <button id="again">Nochmal spielen</button></div>`;
+    overlay.style.display = 'grid';
+    document.getElementById('again').addEventListener('click', startGame);
+  }
+  function tick(now) {
+    if (!running) return;
+    const dt = Math.min((now - last) / 1000, .04); last = now;
+    if (left) x -= 62 * dt;
+    if (right) x += 62 * dt;
+    moveBasket();
+    spawnTimer += dt;
+    if (spawnTimer > .62) { spawn(); spawnTimer = 0; }
+    const basketRect = basket.getBoundingClientRect();
+    const gameRect = game.getBoundingClientRect();
+    const bx = basketRect.left - gameRect.left + basketRect.width / 2;
+    const by = basketRect.top - gameRect.top + basketRect.height / 2;
+    items = items.filter(item => {
+      item.y += item.speed * dt;
+      item.el.style.top = item.y + 'px';
+      const ix = gameRect.width * item.x / 100;
+      if (Math.abs(ix - bx) < 36 && Math.abs(item.y - by) < 35) {
+        item.el.remove();
+        if (item.bomb) { score = Math.max(0, score - 3); }
+        else { score += item.el.textContent === '💖' ? 3 : 1; }
+        scoreEl.textContent = score;
+        return false;
+      }
+      if (item.y > gameRect.height + 35) { item.el.remove(); return false; }
+      return true;
+    });
+    raf = requestAnimationFrame(tick);
+  }
+  function startGame() {
+    cancelAnimationFrame(raf); clearInterval(clock);
+    items.forEach(i => i.el.remove()); items = [];
+    score = 0; time = 30; x = 50; spawnTimer = 0;
+    scoreEl.textContent = score; timeEl.textContent = time; moveBasket();
+    overlay.style.display = 'none'; running = true; last = performance.now();
+    clock = setInterval(() => {
+      time--; timeEl.textContent = time;
+      if (time <= 0) endGame();
+    }, 1000);
+    raf = requestAnimationFrame(tick);
+  }
+  document.getElementById('start').addEventListener('click', startGame);
+  document.addEventListener('keydown', e => {
+    if (['ArrowLeft','a','A'].includes(e.key)) { left = true; e.preventDefault(); }
+    if (['ArrowRight','d','D'].includes(e.key)) { right = true; e.preventDefault(); }
+  });
+  document.addEventListener('keyup', e => {
+    if (['ArrowLeft','a','A'].includes(e.key)) left = false;
+    if (['ArrowRight','d','D'].includes(e.key)) right = false;
+  });
+  const bindHold = (id, dir) => {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', e => { e.preventDefault(); if (dir === 'left') left = true; else right = true; });
+    ['pointerup','pointerleave','pointercancel'].forEach(ev => el.addEventListener(ev, () => { if (dir === 'left') left = false; else right = false; }));
+  };
+  bindHold('left','left'); bindHold('right','right');
+  game.addEventListener('pointermove', e => {
+    if (!running || e.pointerType === 'mouse' && e.buttons === 0) return;
+    const r = game.getBoundingClientRect();
+    x = Math.max(6, Math.min(94, ((e.clientX - r.left) / r.width) * 100));
+    moveBasket();
+  });
+})();
+</script>
+</body>
+</html>

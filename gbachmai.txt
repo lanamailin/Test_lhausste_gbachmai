@@ -1,3 +1,6 @@
 git add gbachmai.txt
 git commit -m "gbachmai wurde hinzugefügt"
 git push
+git add gbachmai.txt
+git commit -m "gbachmai wurde bearbeitet"
+git push

@@ -4,3 +4,5 @@ git push
 git add gbachmai.txt
 git commit -m "gbachmai wurde bearbeitet"
 git push
+
+Dua weida

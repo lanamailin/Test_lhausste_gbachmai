@@ -2,3 +2,8 @@ git add lhausste.txt
 git commit -m "lhausste.txt created"
 git push 
 
+git add lhausste.txt
+git commit -m "lhausste.txt changed"
+git push 
+
+
